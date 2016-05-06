@@ -61,7 +61,11 @@ global DB_DESCRIPTORMATRIX;
 //G_TRAINING_PATH="C:\Projects\imr-eigenfaces\dataset\";
 //G_TRAINING_FOLDERS=40;
 //G_TRAINING_FILES=10;
+global G_TRAINING_PATH;
+global G_TRAINING_FOLDERS;
+global G_TRAINING_FILES;
 
+//If you wanna chamge how much data is used for learning, it's here !
 G_TRAINING_PATH="C:\Projects\imr-eigenfaces\dataset\";
 G_TRAINING_FOLDERS=40;
 G_TRAINING_FILES=5; // Maximum files is limited to 10 (architectures choices)
@@ -72,9 +76,27 @@ disp("LOADING FUNCTIONS...")
 // TEST FUNCTIONS
 ////
 
+function demo_eigenface(path)
+    global ALREADY_COMPUTED;
+    global G_TRAINING_PATH;
+    
+    ALREADY_COMPUTED = 0;
+    G_TRAINING_PATH=path;
+    
+    eigen_bulk_learning();
+    pause
+    showEigenfaces(12);
+    pause
+    showDescriptorPlot();
+    pause
+    disp("NOW, WE ARE GONNA MAKE AN ACCURACY TEST WITH 1000 ACCURATIONS.")
+    disp("THE LAST NUMBER YOURE GONNA SEE IS THE PERCENTAGE OF SUCCESS :")
+    pause
+    disp(test_algorithm(100));
+endfunction
+
 function test_functions()
-    global DB_EIGENFACESMATRIX;
-    global DB_DESCRIPTORMATRIX;
+    // Function used during developpement
     global ALREADY_COMPUTED;
     if ALREADY_COMPUTED == 0 then
         eigen_bulk_learning();
@@ -82,44 +104,65 @@ function test_functions()
     else
         disp("ALREADY COMPUTED !")
     end
-    // We show the 12 first eigenfaces
-    //disp("SHOWING THE FIRST EIGENFACES :")
-    //image = [];
-    //for i=1:12
-    //    vignette=(matrix(DB_EIGENFACESMATRIX(:,i),[46,56])'*1000+128);
-    //    image = [image vignette];
-    //end
-    //myShowImage(image)
-    //pause
-    //disp("SHOWING THE FIRST 2 DIMENSION DESCRIPTOR MATRIX :")
-    // We show the first two eigenfaces as bases for our descriptors
-    //for fo=1:G_TRAINING_FOLDERS
-    //    index=((fo-1)*G_TRAINING_FILES);
-    //    disp(index)
-        //plot2d(DB_DESCRIPTORMATRIX(index+1:index+10,1),DB_DESCRIPTORMATRIX(index+1:index+10,2),style=[color(round(rand()*255),round(rand()*255),round(rand()*255))]);
-    //    plot(DB_DESCRIPTORMATRIX(index+1:index+G_TRAINING_FILES,1),DB_DESCRIPTORMATRIX(index+1:index+G_TRAINING_FILES,2),'Color',[rand() rand() rand()], 'linest', 'none', 'markst', '.');
-    //end
-    //plot(descriptorMatrix(:,1),descriptorMatrix(:,2),'r+');
+    showEigenfaces(12);
+    showDescriptorPlot();
     //pause   
     // We load an unknown image and get his descriptor
-    descriptor=eigen_process("C:\Projects\imr-eigenfaces\dataset\s1\7.pgm");
+    results=eigen_process("C:\Projects\imr-eigenfaces\dataset\s1\7.pgm");
+endfunction
+
+function showEigenfaces(numberOfFaces)
+    global DB_EIGENFACESMATRIX;
+    // We show the x first eigenfaces (12 by default)
+    disp("SHOWING THE FIRST EIGENFACES :")
+    image = [];
+    for i=1:numberOfFaces
+        vignette=(matrix(DB_EIGENFACESMATRIX(:,i),[46,56])'*1000+128);
+        image = [image vignette];
+    end
+    myShowImage(image)
+endfunction
+
+function showDescriptorPlot()
+    global DB_DESCRIPTORMATRIX;
+    disp("SHOWING THE FIRST 2 DIMENSION DESCRIPTOR MATRIX :")
+    // We show the first two eigenfaces as bases for our descriptors
+    for fo=1:G_TRAINING_FOLDERS
+        index=((fo-1)*G_TRAINING_FILES);
+        plot(DB_DESCRIPTORMATRIX(index+1:index+G_TRAINING_FILES,1),DB_DESCRIPTORMATRIX(index+1:index+G_TRAINING_FILES,2),'Color',[rand() rand() rand()], 'linest', 'none', 'markst', '.');
+    end
+endfunction
+
+function successPercentage=test_algorithm(iterations)
+    results=0;
+    for i=1:iterations
+        // We have 40 folders
+        fo=floor(rand()*39)+1;
+        // And we have 10 image each folder
+        fi=floor(rand()*9)+1;
+        // And we gonna check if it's working
+        rfo=eigen_process("C:\Projects\imr-eigenfaces\dataset\s"+string(fo)+"\"+string(fi)+".pgm");
+        if rfo == fo then
+            disp("RECOGNIZED !");
+            results = results + 1;
+        else
+            disp("FAILED");
+        end
+    end
+    successPercentage=(results/iterations)*100;
 endfunction
 
 ////
 // MAIN FUNCTIONS
 ////
 
-
-function eigenfaces_main()
-endfunction
-
-function eigen_process(path)
+function efo=eigen_process(path)
     disp("LAUNCHING THE UNIT PROCESS...")
     image=loading_face(path);
     imageNormalized=normalizing_face(image);
     descriptor=descriptor_gen(imageNormalized);
     scoreVector=descriptor_comparison(descriptor);
-    person_recognition(scoreVector);
+    [results, efo, efi]=person_recognition(scoreVector);
     disp("UNIT DONE !")
 endfunction
 
@@ -141,9 +184,12 @@ endfunction
 ////
 
 //// LOADING IMAGES
-//TODO
+
 function [T,identityMatrix]=loading_training_faces()
     disp("STARTING LOADING TRAINING FACES...");
+    global G_TRAINING_PATH;
+    global G_TRAINING_FOLDER;
+    global G_TRAINING_FILES;
     imageArray=zeros((G_TRAINING_FOLDERS*G_TRAINING_FILES),56*46);
     for fo=1:G_TRAINING_FOLDERS
         for fi=1:G_TRAINING_FILES
@@ -179,6 +225,8 @@ endfunction
 
 function Tnorm=bulk_image_norm(T, myMean, myDeviation)
     disp("STARTING NORMALIZATION...");
+    global G_TRAINING_FOLDER;
+    global G_TRAINING_FILES;
     Tnorm = (T-repmat(myMean, G_TRAINING_FOLDERS*G_TRAINING_FILES, 1))./repmat(myDeviation, G_TRAINING_FOLDERS*G_TRAINING_FILES, 1 );
     disp("DONE !");
 endfunction
@@ -236,7 +284,7 @@ function T=loading_face(path)
     T=matrix(((imresize(imageMatrix, [56 46]))'), 1, 56*46);
     disp("DONE");
 endfunction
-//TODO
+
 
 //// NORMALIZING IMAGE
 function normalizedImage=normalizing_face(T)
@@ -249,7 +297,7 @@ function normalizedImage=normalizing_face(T)
     normalizedImage = (T-DB_MEAN)./DB_DEVIATION;
     disp("DONE");
 endfunction
-//TODO
+
 
 //// DESCRIPTOR GENERATION
 function descriptor=descriptor_gen(normalizedImage)
@@ -258,7 +306,7 @@ function descriptor=descriptor_gen(normalizedImage)
     descriptor = normalizedImage*DB_EIGENFACESMATRIX;
     disp("DONE !");
 endfunction
-//TODO
+
 
 //// DESCRIPTOR COMPARISON
 // That part is pretty complex
@@ -267,6 +315,8 @@ endfunction
 function scoreVector=descriptor_comparison(descriptor)
     disp("GENERATING DESCRIPTOR DISTANCES...");
     global DB_DESCRIPTORMATRIX;
+    global G_TRAINING_FOLDER;
+    global G_TRAINING_FILES;
     // I will calculate the distance vector of each descriptions vectors against
     // the description input
     distanceVectors = DB_DESCRIPTORMATRIX - repmat(descriptor, G_TRAINING_FOLDERS*G_TRAINING_FILES, 1);
@@ -281,8 +331,10 @@ function scoreVector=descriptor_comparison(descriptor)
 endfunction
 
 //// PERSON RECOGNITION
-function resultArray=person_recognition(scoreVector)
+function [resultArray, folderNumber, fileNumber]=person_recognition(scoreVector)
     disp("READING SCORES ...");
+    global G_TRAINING_FOLDER;
+    global G_TRAINING_FILES;
     resultArray=[];
     // We'll take the max value (the most far)
     maxValue=max(scoreVector);
@@ -308,7 +360,7 @@ function resultArray=person_recognition(scoreVector)
     disp("THE FACE THAT YOU GAVE REALLY LOOK CLOSE TO THE FOLDER NUMBER "+string(folderNumber)+" (image "+string(fileNumber)+" ).")
 endfunction
 
-//// TEST
-//// FUNCTIONS
-disp("STARTING DEVEL TEST ROUTINE...")
-test_functions();
+
+disp("IF YOU WANT TO START THE FACE RECOGNITION DEMO")
+disp("LAUNCH demo_eigenface(path) PUTTING THE PATH TO THE IMAGE BASE USED")
+disp("EXAMPLE : demo_eigenface(C:\Projects\imr-eigenfaces\dataset\) WITH QUOTES")
